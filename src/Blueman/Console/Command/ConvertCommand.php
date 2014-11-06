@@ -101,12 +101,45 @@ EOT
                         $request['id'] = $actionId;
                         foreach ($example->requests as $exampleRequest) {
                             $headers = array();
+                            $dataMode = 'raw';
                             foreach ($exampleRequest->headers as $header) {
                                 $headers[] = sprintf('%s: %s', $header->name, $header->value);
+                                if ($header->name === 'Content-Type' && $header->value === 'application/x-www-form-urlencoded') {
+                                    $dataMode = 'urlencoded';
+                                }
                             }
+
                             $request['headers'] = implode("\n", $headers);
-                            $request['data'] = (string)$exampleRequest->body;
-                            $request['dataMode'] = 'raw';
+
+                            if ($dataMode === 'urlencoded') {
+                                $jsonData = json_decode((string)$exampleRequest->body, true);
+
+                                if (false === empty($jsonData)) {
+                                    foreach ($jsonData as $key => $value) {
+                                        $request['data'][] = array(
+                                            'key' => $key,
+                                            'value' => $value,
+                                            'type' => 'text',
+                                            'enabled' => true
+                                        );
+                                    }
+                                } else {
+                                    if (isset($action->parameters) && is_array($action->parameters)) {
+                                        foreach ($action->parameters as $parameter) {
+                                            $request['data'][] = array(
+                                                'key' => $parameter->name,
+                                                'value' => $parameter->example,
+                                                'type' => 'text',
+                                                'enabled' => true
+                                            );
+                                        }
+                                    }
+                                }
+                            } else {
+                                $request['data'] = (string)$exampleRequest->body;
+                            }
+
+                            $request['dataMode'] = $dataMode;
                             $request['collectionId'] = $collection['id'];
                         }
                         $request['url'] = $host.$this->parseUri($resource, $action);
